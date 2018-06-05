@@ -46,3 +46,8 @@ To test using osqueryi, run:
 ## Limitations
 * This extension currently only picks the first broadcast address returned by the query. It will support multiple interfaces in the future.
 * This extension can be easily fingerprinted and detected. There are no plans to modify it to be harder to profile.
+
+## Acknowledgements
+* https://blog.netspi.com/identifying-rogue-nbns-spoofers/
+* https://github.com/violentlydave/Poaching-Hunting-in-an-Uncooperative-Environment/
+* https://github.com/SpiderLabs/Responder
