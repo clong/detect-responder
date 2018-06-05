@@ -1,6 +1,6 @@
 # Detect Responder (LLMNR, NBT-NS, MDNS poisoner) with osquery
 
-[![asciicast](https://asciinema.org/a/m7co9mikmw52Y1kzra5vrKNZs.png)](https://asciinema.org/a/m7co9mikmw52Y1kzra5vrKNZs)
+<img src="img/sample.gif">
 
 ## Overview
 This repo contains a python-based extension for osquery to detect active instances of Responder or any NBT-NS and LLMNR spoofers/poisoners on the network.
@@ -23,7 +23,7 @@ The extension operates by sending 4 network requests:
 ## Installation
 To begin, the osquery-python package must be installed on the system. The easiest way to install it is via `$ sudo pip install osquery`.
 
-Create a folder and `chmod 755` it called `/var/osquery/extensions` (MacOS) or `/etc/osquery/extensions` (Linux) and copy detect_responder.ext to that directory. The extension and directory should have the following permissions:
+Create a folder  called `/var/osquery/extensions` (MacOS) or `/etc/osquery/extensions` (Linux), `chmod 755` it, and copy detect_responder.ext to that directory. The extension and directory should have the following permissions:
 ```
 $ ls -al /var/osquery/extensions
 total 3336
@@ -42,5 +42,5 @@ To test using osqueryi, run:
 `sudo osqueryi --nodisable_extensions --extension /var/osquery/extensions/detect_responder.ext --verbose`
 
 ## Limitations
-* This extension currently only picks the first broadcast address returned by the query. It will support multiple addresses in the future.
-* This extension can be easily fingerprinted and detected. There are no plans to modify it to be harder to detect.
+* This extension currently only picks the first broadcast address returned by the query. It will support multiple interfaces in the future.
+* This extension can be easily fingerprinted and detected. There are no plans to modify it to be harder to profile.

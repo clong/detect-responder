@@ -19,6 +19,6 @@ jobs:
       - run: echo '--nodisable_extensions' | sudo tee -a /etc/osquery/osquery.flags
       - run: echo '--verbose' | sudo tee -a /etc/osquery/osquery.flags
       - run: sudo osqueryctl start
-      - run: sleep 15
+      - run: sleep 25
       - run: sudo grep -c "registered table plugin detect_responder" /var/log/osquery/*
       - run: sudo grep -c "Storing initial results for new scheduled query. detect_responder" /var/log/osquery/*
