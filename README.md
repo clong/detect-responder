@@ -3,6 +3,8 @@
 <img src="img/sample.gif">
 
 ## Overview
+<img src="https://circleci.com/gh/clong/detect-responder.svg?&style=shield">
+
 This repo contains a python-based extension for osquery to detect active instances of Responder or any NBT-NS and LLMNR spoofers/poisoners on the network.
 
 This extension was developed using osquery's Python bindings from https://github.com/osquery/osquery-python/
