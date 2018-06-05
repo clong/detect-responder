@@ -1,0 +1,24 @@
+version: 2
+
+jobs:
+  build:
+    machine: true
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+      - run: wget https://osquery-packages.s3.amazonaws.com/deb/osquery_3.2.4_1.linux.amd64.deb
+      - run: sudo dpkg -i osquery_3.2.4_1.linux.amd64.deb
+      - run: sudo apt-get update && sudo apt-get install tmux
+      - run: sudo mkdir /etc/osquery/extensions && sudo chmod 755 /etc/osquery/extensions
+      - run: sudo cp /home/circleci/repo/detect_responder.ext /etc/osquery/extensions/detect_responder.ext && sudo chmod 755 /etc/osquery/extensions/detect_responder.ext
+      - run: sudo pip install osquery
+      - run: sudo touch /etc/osquery/extensions.load
+      - run: echo '/etc/osquery/extensions/detect_responder.ext' | sudo tee -a /etc/osquery/extensions.load
+      - run: curl "https://gist.githubusercontent.com/clong/d977895e2cd7cb9dafef56a951741b8e/raw/dfd900f19bffc167421bcecc90f917b7d5894a4f/gistfile1.txt" | sudo tee -a /etc/osquery/osquery.conf
+      - run: echo '--nodisable_extensions' | sudo tee -a /etc/osquery/osquery.flags
+      - run: echo '--verbose' | sudo tee -a /etc/osquery/osquery.flags
+      - run: sudo osqueryctl start
+      - run: sleep 15
+      - run: sudo grep -c "registered table plugin detect_responder" /var/log/osquery/*
+      - run: sudo grep -c "Storing initial results for new scheduled query. detect_responder" /var/log/osquery/*

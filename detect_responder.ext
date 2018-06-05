@@ -1,0 +1,130 @@
+#!/usr/bin/env python
+
+import socket
+import osquery
+import random
+import string
+
+@osquery.register_plugin
+
+class MyTablePlugin(osquery.TablePlugin):
+    def name(self):
+        return "detect_responder"
+
+    def columns(self):
+        return [
+            osquery.TableColumn(name="responder_ip", type=osquery.STRING),
+            osquery.TableColumn(name="protocol", type=osquery.STRING),
+            osquery.TableColumn(name="query", type=osquery.STRING),
+            osquery.TableColumn(name="response", type=osquery.STRING),
+        ]
+
+    # Send a LLMNR request for WPAD to Multicast
+    def query_llmnr(self, query, length):
+        # Configure the socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 32)
+        sock.settimeout(2)
+        sock.bind(('0.0.0.0', 0))
+
+        # Configure the destination address and packet data
+        mcast_addr = '224.0.0.252'
+        mcast_port = 5355
+        if query == "random":
+            query = ''.join(random.choice(string.lowercase) for i in range(16))
+        llmnr_packet_data = "\x31\x81\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00" + chr(length) + query + "\x00\x00\x01\x00\x01"
+
+        # Send the LLMNR query
+        sock.sendto(llmnr_packet_data, (mcast_addr, mcast_port))
+
+        # Check if a response was received
+        while 1:
+            try:
+                resp = sock.recvfrom(1024)
+                # If a response was received, parse the results into a row
+                if resp:
+                    row = {}
+                    row["responder_ip"] = str(resp[1][0])
+                    row["query"] = query
+                    row["response"] = str(resp[0][13:(13+length)])
+                    row["protocol"] = "llmnr"
+                    sock.close()
+                    return row
+            # If no response, wait for the socket to timeout and close it
+            except socket.timeout:
+                sock.close()
+                return
+
+    def decode_netbios_name(self, nbname):
+        """
+        Return the NetBIOS first-level decoded nbname.
+        https://stackoverflow.com/questions/13652319/decode-netbios-name-python
+        """
+        if len(nbname) != 32:
+            return nbname
+        l = []
+        for i in range(0, 32, 2):
+            l.append(chr(((ord(nbname[i]) - 0x41) << 4) | ((ord(nbname[i+1]) - 0x41) & 0xf)))
+        return ''.join(l).split('\x00', 1)[0]
+
+    def get_broadcast_addresses(self):
+        # Use osquery to grab a broadcast address
+        # TODO: Add checks for multiple broadcast addresses
+        # TODO: Add checks for no broadcast addresses
+        instance = osquery.SpawnInstance()
+        instance.open()
+        return instance.client.query("SELECT  a.broadcast  FROM interface_addresses a JOIN interface_details d USING (interface) WHERE address NOT LIKE '%:%' AND address!='127.0.0.1';")
+
+
+    def query_nbns(self, query):
+        # TODO: Loop through multiple broadcast addresses if there is more than one
+        # Configure the socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.settimeout(2)
+        sock.bind(('0.0.0.0', 0))
+
+        # Configure the destination address and packet data
+        broadcast_address = self.get_broadcast_addresses().response[0]['broadcast']
+        port = 137
+        if query == "WPAD":
+            # Format WPAD into NetBIOS query format
+            nbns_query = "\x46\x48\x46\x41\x45\x42\x45\x45\x43\x41\x43\x41\x43\x41\x43\x41\x43\x41\x43\x41\x43\x41\x43\x41\x43\x41\x43\x41\x43\x41\x41\x41"
+        else:
+            # Create a query consisting of 16 random characters
+            query = ''.join(random.choice(string.lowercase) for i in range(16))
+            # Encode the query in the format required by NetBIOS
+            nbns_query = ''.join([chr((ord(c)>>4) + ord('A')) + chr((ord(c)&0xF) + ord('A')) for c in query])
+
+        # Send the NBNS query
+        sock.sendto("\x87\x3c\x01\x10\x00\x01\x00\x00\x00\x00\x00\x00\x20" + nbns_query + "\x00\x00\x20\x00\x01", (broadcast_address, port))
+
+        # Check if a response was received
+        while 1:
+            try:
+                resp = sock.recvfrom(1024)
+                # If a response was received, parse the results into a row
+                if resp:
+                    row = {}
+                    row["responder_ip"] = str(resp[1][0])
+                    row["query"] = str(query).strip()
+                    # Convert the NetBIOS encoded response back to the original query
+                    row["response"] = self.decode_netbios_name(str(resp[0][13:45])).strip()
+                    row["protocol"] = "nbns"
+                    sock.close()
+                    return row
+            # If no response, wait for the socket to timeout and close it
+            except socket.timeout:
+                sock.close()
+                return
+
+    def generate(self, context):
+        query_data = []
+        query_data += [self.query_llmnr("wpad", 4)] if self.query_llmnr("wpad", 4) is not None else []
+        query_data += [self.query_llmnr("random", 16)] if self.query_llmnr("random", 16) is not None else []
+        query_data += [self.query_nbns("WPAD")] if self.query_nbns("WPAD") is not None else []
+        query_data += [self.query_nbns("random")] if self.query_nbns("random") is not None else []
+        return query_data
+
+if __name__ == "__main__":
+    osquery.start_extension(name="responder_extension", version="1.0.0")
